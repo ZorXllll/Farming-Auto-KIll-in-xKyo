@@ -12,11 +12,10 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Cache tracking variables
+-- Cache tracking variables (Streak removed)
 local friendCache = {}
 local totalKills = 0
 local sessionKills = 0
-local currentStreak = 0
 
 -- --- NEON RED SCREEN GUI CREATION ---
 local ScreenGui = Instance.new("ScreenGui")
@@ -33,10 +32,10 @@ if not successGui then
     end)
 end
 
--- Main Window Frame
+-- Main Window Frame (Height adjusted since one stat was removed)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 215)
+MainFrame.Size = UDim2.new(0, 300, 0, 180)
 MainFrame.Position = UDim2.new(0, 40, 0, 40)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 12)
 MainFrame.BorderSizePixel = 0
@@ -165,8 +164,7 @@ end
 
 local KillsLabel = CreateStatCard("KillsCard", "Total Kills: 0", 1)
 local GainedLabel = CreateStatCard("GainedCard", "Gained Kills: 0", 2)
-local StreakLabel = CreateStatCard("StreakCard", "Kill Streak: 0", 3)
-local CountdownLabel = CreateStatCard("CountdownCard", "Next Hop: 40s", 4)
+local CountdownLabel = CreateStatCard("CountdownCard", "Next Hop: 40s", 3)
 CountdownLabel.TextColor3 = Color3.fromRGB(255, 80, 110)
 
 local ProgressContainer = Instance.new("Frame")
@@ -204,14 +202,13 @@ ToggleButton.MouseButton1Click:Connect(function()
     ContentContainer.Visible = not minimized
     ToggleButton.Text = minimized and "+" or "-"
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-        Size = minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 215)
+        Size = minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 180)
     }):Play()
 end)
 
 local function UpdateDisplay()
     KillsLabel.Text = "Total Kills: " .. totalKills
     GainedLabel.Text = "Gained Kills: " .. sessionKills
-    StreakLabel.Text = "Kill Streak: " .. currentStreak
 end
 
 local function setupLeaderboardTracking()
@@ -219,7 +216,6 @@ local function setupLeaderboardTracking()
     if not leaderstats then return end
 
     local killsValue = leaderstats:FindFirstChild("Kills") or leaderstats:FindFirstChild("Kills ")
-    local streakValue = leaderstats:FindFirstChild("Streak") or leaderstats:FindFirstChild("KillStreak") or leaderstats:FindFirstChild("Kill Streak")
 
     if killsValue and (killsValue:IsA("IntValue") or killsValue:IsA("NumberValue")) then
         local lastKills = killsValue.Value
@@ -232,14 +228,6 @@ local function setupLeaderboardTracking()
             end
             lastKills = newVal
             totalKills = newVal
-            UpdateDisplay()
-        end)
-    end
-
-    if streakValue and (streakValue:IsA("IntValue") or streakValue:IsA("NumberValue")) then
-        currentStreak = streakValue.Value
-        streakValue.Changed:Connect(function(newVal)
-            currentStreak = newVal
             UpdateDisplay()
         end)
     end
@@ -281,7 +269,7 @@ function isWhitelisted(targetPlayer)
     return (_G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId]) and true or false
 end
 
--- New AutoKillLobby Implementation
+-- AutoKillLobby Implementation
 local function AutoKillLobby()
     local targetList = Players:GetPlayers()
     
@@ -292,17 +280,14 @@ local function AutoKillLobby()
             
             if tRoot and tHumanoid and tHumanoid.Health > 0 then
                 local startTime = tick()
-                -- Kill loop for 0.6 seconds per player
                 while tick() - startTime < 0.6 and tHumanoid.Health > 0 and targetPlayer.Character and targetPlayer.Character.Parent do
                     local myChar = player.Character
                     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                     local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
                     
                     if myChar and myRoot and myHumanoid then
-                        -- Lock to player position (directly behind)
                         myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
                         
-                        -- Auto Punch Logic
                         local tool = myChar:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
                         if tool then
                             if tool.Parent ~= myChar then
@@ -311,7 +296,6 @@ local function AutoKillLobby()
                             tool:Activate()
                         end
                         
-                        -- Remote trigger if exists
                         local remotes = ReplicatedStorage:FindFirstChild("RemotesEvent")
                         if remotes and remotes:FindFirstChild("SizeChanged") then
                             remotes.SizeChanged:FireServer(1)
@@ -355,7 +339,6 @@ function GetNextServerID()
         local playing = tonumber(v.playing) or 0
         local maxPlayers = tonumber(v.maxPlayers) or 0
         
-        -- Prioritizing high population servers while ensuring space to join
         if playing >= 5 and playing < maxPlayers and ID ~= game.JobId then
             local alreadyVisited = false
             for _, Existing in pairs(AllIDs) do
