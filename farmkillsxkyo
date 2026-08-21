@@ -379,7 +379,7 @@ function GetNextServerID()
 end
 
 function Teleport()
-    local maxTime = 40
+    local maxTime = 60
     local timeLeft = maxTime
     
     ProgressBar.Size = UDim2.new(1, 0, 1, 0)
