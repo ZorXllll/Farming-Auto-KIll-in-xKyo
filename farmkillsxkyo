@@ -12,7 +12,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Cache tracking variables (Streak removed)
+-- Cache tracking variables
 local friendCache = {}
 local totalKills = 0
 local sessionKills = 0
@@ -32,7 +32,7 @@ if not successGui then
     end)
 end
 
--- Main Window Frame (Height adjusted since one stat was removed)
+-- Main Window Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 300, 0, 180)
@@ -318,7 +318,8 @@ task.spawn(function()
 end)
 
 function GetNextServerID()
-    local url = 'https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Desc&limit=100'
+    -- Changed sortOrder to Asc to find open public servers quicker
+    local url = 'https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'
     if foundAnything ~= "" then
         url = url .. '&cursor=' .. foundAnything
     end
@@ -331,6 +332,8 @@ function GetNextServerID()
     
     if res.nextPageCursor and res.nextPageCursor ~= "" and res.nextPageCursor ~= "null" then
         foundAnything = res.nextPageCursor
+    else
+        foundAnything = ""
     end
 
     local validServers = {}
@@ -339,7 +342,8 @@ function GetNextServerID()
         local playing = tonumber(v.playing) or 0
         local maxPlayers = tonumber(v.maxPlayers) or 0
         
-        if playing >= 5 and playing < maxPlayers and ID ~= game.JobId then
+        -- Relaxed filter to >= 1 player so it never gets stuck
+        if playing >= 1 and playing < (maxPlayers - 1) and ID ~= game.JobId then
             local alreadyVisited = false
             for _, Existing in pairs(AllIDs) do
                 if ID == tostring(Existing) then
@@ -381,7 +385,7 @@ function Teleport()
     local attempts = 0
     local targetServer = nil
     
-    while not targetServer and attempts < 10 do
+    while not targetServer and attempts < 5 do
         CountdownLabel.Text = "Searching... (" .. (attempts + 1) .. ")"
         targetServer = GetNextServerID()
         if not targetServer then
@@ -390,26 +394,36 @@ function Teleport()
         end
     end
     
+    CountdownLabel.Text = "Server Hopping"
+    
     if targetServer then
         table.insert(AllIDs, targetServer)
         pcall(writefile, "KyoOnTop", HttpService:JSONEncode(AllIDs))
-        CountdownLabel.Text = "Server Hopping..."
         
-        TeleportService.TeleportInitFailed:Connect(function(playerObj, result, message)
-            CountdownLabel.Text = "Failed. Retrying..."
-            task.wait(2)
-            Teleport()
-        end)
-
-        pcall(function()
+        -- Try specific instance teleport first
+        local tpSuccess = pcall(function()
             TeleportService:TeleportToPlaceInstance(PlaceID, targetServer, player)
         end)
+        
+        -- If specific instance fails, drop back to standard auto-matchmaking server hop
+        if not tpSuccess then
+            CountdownLabel.Text = "Fallback Hopping..."
+            task.wait(1)
+            pcall(function()
+                TeleportService:Teleport(PlaceID, player)
+            end)
+        end
     else
-        CountdownLabel.Text = "Retrying..."
+        -- If API completely fails to find a valid server, use standard auto-matchmaking hop
+        CountdownLabel.Text = "Auto Hopping..."
         AllIDs = {actualHour}
+        foundAnything = ""
         pcall(writefile, "KyoOnTop", HttpService:JSONEncode(AllIDs))
-        task.wait(2)
-        Teleport()
+        task.wait(1)
+        
+        pcall(function()
+            TeleportService:Teleport(PlaceID, player)
+        end)
     end
 end
 
