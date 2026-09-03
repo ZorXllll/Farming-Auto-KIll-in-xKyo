@@ -1,9 +1,3 @@
---[[
-	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-]]
-
---V2 Combined with Auto-Kill, GUI Tracker, Countdown Timer, Animated Progress Bar, and No FallenPartsDestroyHeight
-
 local PlaceID = game.PlaceId
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
@@ -76,7 +70,7 @@ TitleLabel.Name = "TitleLabel"
 TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ AUTOKILL & TIMER"
+TitleLabel.Text = "⚡ AUTOKILL"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 40, 80)
 TitleLabel.TextSize = 17
 TitleLabel.Font = Enum.Font.GothamBold
