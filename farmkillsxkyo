@@ -280,13 +280,13 @@ local function AutoKillLobby()
             
             if tRoot and tHumanoid and tHumanoid.Health > 0 then
                 local startTime = tick()
-                while tick() - startTime < 0.6 and tHumanoid.Health > 0 and targetPlayer.Character and targetPlayer.Character.Parent do
+                while tick() - startTime < 0.3 and tHumanoid.Health > 0 and targetPlayer.Character and targetPlayer.Character.Parent do
                     local myChar = player.Character
                     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                     local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
                     
                     if myChar and myRoot and myHumanoid then
-                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 1)
                         
                         local tool = myChar:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
                         if tool then
@@ -366,7 +366,7 @@ function GetNextServerID()
 end
 
 function Teleport()
-    local maxTime = 120
+    local maxTime = 60
     local timeLeft = maxTime
     
     ProgressBar.Size = UDim2.new(1, 0, 1, 0)
