@@ -1,11 +1,12 @@
-local PlaceID = game.PlaceId
-local AllIDs = {}
-local foundAnything = ""
-local actualHour = os.date("!*t").hour
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
 
+--V2 Combined with Auto-Kill, GUI Tracker, Countdown Timer, Animated Progress Bar, and No FallenPartsDestroyHeight
+
+local PlaceID = game.PlaceId
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
@@ -13,9 +14,10 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Cache tracking variables
-local friendCache = {}
 local totalKills = 0
 local sessionKills = 0
+local maxHopTime = 60
+local serverTimeLeft = maxHopTime
 
 -- --- NEON RED SCREEN GUI CREATION ---
 local ScreenGui = Instance.new("ScreenGui")
@@ -32,10 +34,10 @@ if not successGui then
     end)
 end
 
--- Main Window Frame
+-- Main Window Frame (Expanded to fit progress bar)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Size = UDim2.new(0, 300, 0, 205)
 MainFrame.Position = UDim2.new(0, 40, 0, 40)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 12)
 MainFrame.BorderSizePixel = 0
@@ -74,7 +76,7 @@ TitleLabel.Name = "TitleLabel"
 TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ AUTOKILL & HOP"
+TitleLabel.Text = "⚡ AUTOKILL & TIMER"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 40, 80)
 TitleLabel.TextSize = 17
 TitleLabel.Font = Enum.Font.GothamBold
@@ -164,37 +166,37 @@ end
 
 local KillsLabel = CreateStatCard("KillsCard", "Total Kills: 0", 1)
 local GainedLabel = CreateStatCard("GainedCard", "Gained Kills: 0", 2)
-local CountdownLabel = CreateStatCard("CountdownCard", "Next Hop: 40s", 3)
-CountdownLabel.TextColor3 = Color3.fromRGB(255, 80, 110)
+local TimerLabel = CreateStatCard("TimerCard", "Next Hop in: 60s", 3)
 
+-- --- PROGRESS BAR CREATION ---
 local ProgressContainer = Instance.new("Frame")
 ProgressContainer.Name = "ProgressContainer"
-ProgressContainer.Size = UDim2.new(1, 0, 0, 6)
-ProgressContainer.BackgroundColor3 = Color3.fromRGB(25, 12, 15)
+ProgressContainer.Size = UDim2.new(1, 0, 0, 12)
+ProgressContainer.BackgroundColor3 = Color3.fromRGB(22, 12, 15)
 ProgressContainer.BorderSizePixel = 0
-ProgressContainer.LayoutOrder = 10
+ProgressContainer.LayoutOrder = 4
 ProgressContainer.Parent = ContentContainer
 
 local ProgressCorner = Instance.new("UICorner")
-ProgressCorner.CornerRadius = UDim.new(1, 0)
+ProgressCorner.CornerRadius = UDim.new(0, 6)
 ProgressCorner.Parent = ProgressContainer
+
+local ProgressStroke = Instance.new("UIStroke")
+ProgressStroke.Color = Color3.fromRGB(255, 0, 60)
+ProgressStroke.Thickness = 1
+ProgressStroke.Transparency = 0.6
+ProgressStroke.Parent = ProgressContainer
 
 local ProgressBar = Instance.new("Frame")
 ProgressBar.Name = "ProgressBar"
-ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 0, 51)
+ProgressBar.Size = UDim2.new(1, 0, 1, 0)
+ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 40, 80)
 ProgressBar.BorderSizePixel = 0
 ProgressBar.Parent = ProgressContainer
 
-local ProgressGlow = Instance.new("UIStroke")
-ProgressGlow.Color = Color3.fromRGB(255, 100, 120)
-ProgressGlow.Thickness = 1
-ProgressGlow.Transparency = 0.3
-ProgressGlow.Parent = ProgressBar
-
-local ProgressBarCorner = Instance.new("UICorner")
-ProgressBarCorner.CornerRadius = UDim.new(1, 0)
-ProgressBarCorner.Parent = ProgressBar
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(0, 6)
+BarCorner.Parent = ProgressBar
 
 local minimized = false
 ToggleButton.MouseButton1Click:Connect(function()
@@ -202,13 +204,19 @@ ToggleButton.MouseButton1Click:Connect(function()
     ContentContainer.Visible = not minimized
     ToggleButton.Text = minimized and "+" or "-"
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-        Size = minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 180)
+        Size = minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 205)
     }):Play()
 end)
 
 local function UpdateDisplay()
     KillsLabel.Text = "Total Kills: " .. totalKills
     GainedLabel.Text = "Gained Kills: " .. sessionKills
+    TimerLabel.Text = "Next Hop in: " .. math.max(0, serverTimeLeft) .. "s"
+    
+    local percentage = math.clamp(serverTimeLeft / maxHopTime, 0, 1)
+    TweenService:Create(ProgressBar, TweenInfo.new(0.9, Enum.EasingStyle.Linear), {
+        Size = UDim2.new(percentage, 0, 1, 0)
+    }):Play()
 end
 
 local function setupLeaderboardTracking()
@@ -236,45 +244,57 @@ local function setupLeaderboardTracking()
 end
 task.spawn(setupLeaderboardTracking)
 
--- Safe File Loading
-local function loadHistory()
-    if pcall(function() return isfile and isfile("KyoOnTop") end) then
-        local success, content = pcall(readfile, "KyoOnTop")
-        if success and content then
-            local decodedSuccess, decoded = pcall(HttpService.JSONDecode, HttpService, content)
-            if decodedSuccess and type(decoded) == "table" then
-                AllIDs = decoded
-            end
-        end
-    end
-    
-    if #AllIDs == 0 or AllIDs[1] ~= actualHour then
-        AllIDs = {actualHour}
-        pcall(writefile, "KyoOnTop", HttpService:JSONEncode(AllIDs))
-    end
-end
-pcall(loadHistory)
+-- Server Hopper Logic
+local function GETOUT()
+local Services = setmetatable({}, {
+ __index = function(self, name)
+  local success, cache = pcall(function()
+   return cloneref(game:GetService(name))
+  end)
+  if success then
+   rawset(self, name, cache)
+   return cache
+  else
+   error("Invalid Service: " .. tostring(name))
+  end
+ end
+})
+local JobId = game.JobId
+local servers = {}
+ local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
+ local body = Services.HttpService:JSONDecode(req)
 
--- Global State & Whitelist System
+ if body and body.data then
+  for i, v in next, body.data do
+   if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
+    table.insert(servers, 1, v.id)
+   end
+  end
+
+end
+if #servers >= 1 then
+Services.TeleportService:TeleportToPlaceInstance(PlaceID, servers[math.random(1, #servers)], game.Players.LocalPlayer)
+end
+end
+
+-- Server hops automatically after 60 seconds (with live progress bar countdown)
+task.spawn(function()
+    while serverTimeLeft > 0 do
+        task.wait(1)
+        serverTimeLeft = serverTimeLeft - 1
+        UpdateDisplay()
+    end
+    GETOUT()
+end)
+
+-- Auto-Kill Logic Integration
 _G.autokillall = true
-_G.whitelistTable = {} 
-_G.friendsCache = {}
-_G.FriendsWhitelistActive = false
 
-function isWhitelisted(targetPlayer)
-    if not targetPlayer or targetPlayer == player then return true end
-    local targetNameLower = targetPlayer.Name:lower()
-    local targetDisplayLower = targetPlayer.DisplayName:lower()
-    if table.find(_G.whitelistTable, targetNameLower) or table.find(_G.whitelistTable, targetDisplayLower) then return true end
-    return (_G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId]) and true or false
-end
-
--- AutoKillLobby Implementation
 local function AutoKillLobby()
     local targetList = Players:GetPlayers()
     
     for _, targetPlayer in ipairs(targetList) do
-        if targetPlayer ~= player and targetPlayer.Character and not isWhitelisted(targetPlayer) then
+        if targetPlayer ~= player and targetPlayer.Character then
             local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
             local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
             
@@ -317,114 +337,20 @@ task.spawn(function()
     end
 end)
 
-function GetNextServerID()
-    -- Changed sortOrder to Asc to find open public servers quicker
-    local url = 'https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'
-    if foundAnything ~= "" then
-        url = url .. '&cursor=' .. foundAnything
-    end
-    
-    local success, res = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet(url))
-    end)
-    
-    if not success or not res or not res.data then return nil end
-    
-    if res.nextPageCursor and res.nextPageCursor ~= "" and res.nextPageCursor ~= "null" then
-        foundAnything = res.nextPageCursor
-    else
-        foundAnything = ""
-    end
-
-    local validServers = {}
-    for _, v in pairs(res.data) do
-        local ID = tostring(v.id)
-        local playing = tonumber(v.playing) or 0
-        local maxPlayers = tonumber(v.maxPlayers) or 0
-        
-        -- Relaxed filter to >= 1 player so it never gets stuck
-        if playing >= 1 and playing < (maxPlayers - 1) and ID ~= game.JobId then
-            local alreadyVisited = false
-            for _, Existing in pairs(AllIDs) do
-                if ID == tostring(Existing) then
-                    alreadyVisited = true
-                    break
-                end
-            end
-            
-            if not alreadyVisited then
-                table.insert(validServers, ID)
+while true do
+task.wait(1)
+pcall(function()
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            if game.Players.LocalPlayer.Character.Humanoid.Health <= game.Players.LocalPlayer.Character.Humanoid.MaxHealth / 10 then
+                GETOUT()
             end
         end
-    end
-    
-    if #validServers > 0 then
-        return validServers[math.random(1, #validServers)]
-    end
-    
-    return nil
-end
+end)
 
-function Teleport()
-    local maxTime = 60
-    local timeLeft = maxTime
-    
-    ProgressBar.Size = UDim2.new(1, 0, 1, 0)
-    
-    while timeLeft > 0 do
-        CountdownLabel.Text = "Next Hop: " .. math.ceil(timeLeft) .. "s"
-        local progress = timeLeft / maxTime
-        TweenService:Create(ProgressBar, TweenInfo.new(1, Enum.EasingStyle.Linear), {
-            Size = UDim2.new(progress, 0, 1, 0)
-        }):Play()
-        
-        task.wait(1)
-        timeLeft = timeLeft - 1
-    end
-    
-    local attempts = 0
-    local targetServer = nil
-    
-    while not targetServer and attempts < 5 do
-        CountdownLabel.Text = "Searching... (" .. (attempts + 1) .. ")"
-        targetServer = GetNextServerID()
-        if not targetServer then
-            attempts = attempts + 1
-            task.wait(1)
-        end
-    end
-    
-    CountdownLabel.Text = "Server Hopping"
-    
-    if targetServer then
-        table.insert(AllIDs, targetServer)
-        pcall(writefile, "KyoOnTop", HttpService:JSONEncode(AllIDs))
-        
-        -- Try specific instance teleport first
-        local tpSuccess = pcall(function()
-            TeleportService:TeleportToPlaceInstance(PlaceID, targetServer, player)
-        end)
-        
-        -- If specific instance fails, drop back to standard auto-matchmaking server hop
-        if not tpSuccess then
-            CountdownLabel.Text = "Fallback Hopping..."
-            task.wait(1)
-            pcall(function()
-                TeleportService:Teleport(PlaceID, player)
-            end)
-        end
-    else
-        -- If API completely fails to find a valid server, use standard auto-matchmaking hop
-        CountdownLabel.Text = "Auto Hopping..."
-        AllIDs = {actualHour}
-        foundAnything = ""
-        pcall(writefile, "KyoOnTop", HttpService:JSONEncode(AllIDs))
-        task.wait(1)
-        
-        pcall(function()
-            TeleportService:Teleport(PlaceID, player)
-        end)
-    end
+game:GetService("RunService").RenderStepped:Connect(function()
+if #game.Players:GetPlayers() <= 9 then
+task.wait(6)
+GETOUT()
 end
-
-task.spawn(Teleport)
+end)
+end
