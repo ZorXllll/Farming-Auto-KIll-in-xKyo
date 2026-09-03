@@ -264,7 +264,6 @@ local servers = {}
     table.insert(servers, 1, v.id)
    end
   end
-
 end
 if #servers >= 1 then
 Services.TeleportService:TeleportToPlaceInstance(PlaceID, servers[math.random(1, #servers)], game.Players.LocalPlayer)
@@ -330,21 +329,3 @@ task.spawn(function()
         RunService.Heartbeat:Wait() 
     end
 end)
-
-while true do
-task.wait(1)
-pcall(function()
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-            if game.Players.LocalPlayer.Character.Humanoid.Health <= game.Players.LocalPlayer.Character.Humanoid.MaxHealth / 10 then
-                GETOUT()
-            end
-        end
-end)
-
-game:GetService("RunService").RenderStepped:Connect(function()
-if #game.Players:GetPlayers() <= 9 then
-task.wait(6)
-GETOUT()
-end
-end)
-end
