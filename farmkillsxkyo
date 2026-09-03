@@ -12,6 +12,7 @@ local totalKills = 0
 local sessionKills = 0
 local maxHopTime = 60
 local serverTimeLeft = maxHopTime
+local FastPunchConnection = nil
 
 -- --- NEON RED SCREEN GUI CREATION ---
 local ScreenGui = Instance.new("ScreenGui")
@@ -70,9 +71,9 @@ TitleLabel.Name = "TitleLabel"
 TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ AUTOKILL"
+TitleLabel.Text = "Farming Kill ZorX~Private"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 40, 80)
-TitleLabel.TextSize = 17
+TitleLabel.TextSize = 20
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
@@ -80,7 +81,7 @@ TitleLabel.Parent = TopBar
 local TitleGlow = Instance.new("UIStroke")
 TitleGlow.Color = Color3.fromRGB(255, 0, 60)
 TitleGlow.Thickness = 1
-TitleGlow.Transparency = 0.4
+TitleGlow.Transparency = 0.5
 TitleGlow.Parent = TitleLabel
 
 local ToggleButton = Instance.new("TextButton")
@@ -240,34 +241,34 @@ task.spawn(setupLeaderboardTracking)
 
 -- Server Hopper Logic
 local function GETOUT()
-local Services = setmetatable({}, {
- __index = function(self, name)
-  local success, cache = pcall(function()
-   return cloneref(game:GetService(name))
-  end)
-  if success then
-   rawset(self, name, cache)
-   return cache
-  else
-   error("Invalid Service: " .. tostring(name))
-  end
- end
-})
-local JobId = game.JobId
-local servers = {}
- local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
- local body = Services.HttpService:JSONDecode(req)
+    local Services = setmetatable({}, {
+       __index = function(self, name)
+          local success, cache = pcall(function()
+             return cloneref(game:GetService(name))
+          end)
+          if success then
+             rawset(self, name, cache)
+             return cache
+          else
+             error("Invalid Service: " .. tostring(name))
+          end
+       end
+    })
+    local JobId = game.JobId
+    local servers = {}
+    local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
+    local body = Services.HttpService:JSONDecode(req)
 
- if body and body.data then
-  for i, v in next, body.data do
-   if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
-    table.insert(servers, 1, v.id)
-   end
-  end
-end
-if #servers >= 1 then
-Services.TeleportService:TeleportToPlaceInstance(PlaceID, servers[math.random(1, #servers)], game.Players.LocalPlayer)
-end
+    if body and body.data then
+       for i, v in next, body.data do
+          if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
+             table.insert(servers, 1, v.id)
+          end
+       end
+    end
+    if #servers >= 1 then
+        Services.TeleportService:TeleportToPlaceInstance(PlaceID, servers[math.random(1, #servers)], game.Players.LocalPlayer)
+    end
 end
 
 -- Server hops automatically after 60 seconds (with live progress bar countdown)
@@ -280,14 +281,49 @@ task.spawn(function()
     GETOUT()
 end)
 
--- Auto-Kill Logic Integration
+-- Auto-Kill & Fast Punch Integration Logic
 _G.autokillall = true
+_G.punchanim = true
+
+FastPunchConnection = RunService.Heartbeat:Connect(function()
+    if _G.punchanim then
+        local Character = player.Character
+        if Character then
+            local Humanoid = Character:FindFirstChildOfClass('Humanoid')
+            local PunchTool = player.Backpack:FindFirstChild('Punch') or Character:FindFirstChild('Punch')
+            
+            if PunchTool then
+                local attackTime = PunchTool:FindFirstChild('attackTime')
+                if attackTime then 
+                    attackTime.Value = 0 
+                end
+                
+                if Humanoid and PunchTool.Parent ~= Character then 
+                    Humanoid:EquipTool(PunchTool) 
+                end
+                
+                PunchTool:Activate()
+            end
+            
+            local remotes = ReplicatedStorage:FindFirstChild("RemotesEvent")
+            if remotes and remotes:FindFirstChild("SizeChanged") then
+                remotes.SizeChanged:FireServer(1)
+            end
+        end
+    end
+end)
 
 local function AutoKillLobby()
     local targetList = Players:GetPlayers()
     
     for _, targetPlayer in ipairs(targetList) do
-        if targetPlayer ~= player and targetPlayer.Character then
+        -- Skip targeting friends (uses Roblox's built-in IsFriendsWith method)
+        local isFriend = false
+        pcall(function()
+            isFriend = player:IsFriendsWith(targetPlayer.UserId)
+        end)
+
+        if targetPlayer ~= player and not isFriend and targetPlayer.Character then
             local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
             local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
             
@@ -299,7 +335,7 @@ local function AutoKillLobby()
                     local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
                     
                     if myChar and myRoot and myHumanoid then
-                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 0)
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 1)
                         
                         local tool = myChar:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
                         if tool then
