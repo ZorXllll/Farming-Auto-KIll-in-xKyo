@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Cache tracking variables
 local totalKills = 0
 local sessionKills = 0
-local maxHopTime = 60
+local maxHopTime = 80
 local serverTimeLeft = maxHopTime
 local FastPunchConnection = nil
 
@@ -271,7 +271,7 @@ local function GETOUT()
     end
 end
 
--- Server hops automatically after 60 seconds (with live progress bar countdown)
+-- Server hops automatically after 80 seconds (with live progress bar countdown)
 task.spawn(function()
     while serverTimeLeft > 0 do
         task.wait(1)
