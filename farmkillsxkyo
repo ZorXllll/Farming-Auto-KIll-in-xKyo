@@ -335,7 +335,7 @@ local function AutoKillLobby()
                     local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
                     
                     if myChar and myRoot and myHumanoid then
-                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 0)
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
                         
                         local tool = myChar:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
                         if tool then
